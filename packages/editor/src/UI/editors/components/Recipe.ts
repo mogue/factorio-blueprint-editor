@@ -1,3 +1,4 @@
+import * as PIXI from 'pixi.js'
 import G from '../../../common/globals'
 import { Entity } from '../../../core/Entity'
 import { Slot } from '../../controls/Slot'
@@ -13,9 +14,19 @@ export class Recipe extends Slot {
 
         this.m_Entity = entity
         this.updateContent(this.m_Entity.recipe)
-        this.on('pointerdown', (e: PIXI.interaction.InteractionEvent) => this.onSlotPointerDown(e))
+        this.on('pointerdown', (e: PIXI.InteractionEvent) => this.onSlotPointerDown(e))
 
-        this.m_Entity.on('recipe', recipe => this.updateContent(recipe))
+        this.onEntityChange('recipe', recipe => this.updateContent(recipe))
+    }
+
+    private onEntityChange(event: string, fn: (...args: any[]) => void): void {
+        this.m_Entity.on(event, fn)
+        this.once('destroy', () => this.m_Entity.off(event, fn))
+    }
+
+    public destroy(opts?: boolean | PIXI.IDestroyOptions): void {
+        this.emit('destroy')
+        super.destroy(opts)
     }
 
     /** Update Content Icon */
@@ -31,7 +42,7 @@ export class Recipe extends Slot {
     }
 
     /** Event handler for click on slot */
-    private onSlotPointerDown(e: PIXI.interaction.InteractionEvent): void {
+    private onSlotPointerDown(e: PIXI.InteractionEvent): void {
         e.stopPropagation()
         if (e.data.button === 0) {
             G.UI.createInventory('Select Recipe', this.m_Entity.acceptedRecipes, name => {

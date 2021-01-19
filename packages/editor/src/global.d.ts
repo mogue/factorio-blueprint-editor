@@ -1,5 +1,5 @@
 declare module '*.json' {
-    const content: object
+    const content: Record<string, unknown>
     export default content
 }
 
@@ -39,8 +39,9 @@ declare namespace BPS {
     interface IWireColor {
         /** Entity number */
         entity_id: number
-        /** Entity side */
+        /** Entity side (1 or 2) for red or green wires */
         circuit_id?: number
+        /** Entity side (0 or 1) for copper wires */
         wire_id?: number
     }
 
@@ -110,6 +111,8 @@ declare namespace BPS {
 
         /** train stop station name, only present if entity is train-stop */
         station?: string
+        /** trains limit, only present if entity is train-stop */
+        manual_trains_limit?: number
         /** only present if entity is locomotive or train-stop */
         color?: IColor
         /** only present if entity is locomotive, cargo_wagon or fluid_wagon */
@@ -119,6 +122,8 @@ declare namespace BPS {
             filters: IFilter[]
         }
 
+        /** only present if entity is power-switch */
+        switch_state?: boolean
         /** auto launch, only present if entity is rocket-silo */
         auto_launch?: boolean
         /** override stack size, only present if entity is of type inserter */
@@ -133,7 +138,7 @@ declare namespace BPS {
         request_filters?: {
             index: number
             name: string
-            count: number
+            count?: number
         }[]
 
         /** only present if entity is programmable-speaker */
@@ -183,6 +188,9 @@ declare namespace BPS {
             /** only present if entity is infinity_chest */
             remove_unfiltered_items?: boolean
         }
+
+        /** power pole wire connections */
+        neighbours?: number[]
 
         /** wire connections */
         connections?: IConnection
@@ -234,6 +242,10 @@ declare namespace BPS {
             read_stopped_train?: boolean
             /** only present if entity is train-stop */
             train_stopped_signal?: ISignal
+            /** only present if entity is train-stop */
+            set_trains_limit?: boolean
+            /** only present if entity is train-stop */
+            trains_limit_signal?: ISignal
 
             /** only present if entity is rail-signal */
             circuit_close_signal?: boolean
@@ -306,18 +318,24 @@ declare namespace BPS {
         }[]
     }
 
+    interface IIcon {
+        index: 1 | 2 | 3 | 4
+        signal: ISignal
+    }
+
     interface IBlueprint {
         version: number
         item: 'blueprint'
-        icons: {
-            index: 1 | 2 | 3 | 4
-            signal: ISignal
-        }[]
+        icons: IIcon[]
 
         label?: string
+        description?: string
         entities?: IEntity[]
         tiles?: ITile[]
         schedules?: ISchedule[]
+        absolute_snapping?: boolean
+        snap_to_grid?: IPoint
+        position_relative_to_grid?: IPoint
     }
 
     interface IBlueprintBook {
@@ -325,10 +343,13 @@ declare namespace BPS {
         item: 'blueprint_book'
         active_index: number
         blueprints: {
-            blueprint: IBlueprint
             index: number
+            blueprint?: IBlueprint
+            blueprint_book?: IBlueprintBook
         }[]
 
         label?: string
+        description?: string
+        icons?: IIcon[]
     }
 }

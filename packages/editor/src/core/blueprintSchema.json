@@ -2,51 +2,11 @@
     "$schema": "http://json-schema.org/draft-07/schema#",
     "$id": "blueprintSchema.json",
     "type": "object",
-    "oneOf": [
-        {
-            "required": ["blueprint"],
-            "additionalProperties": false,
-            "properties": {
-                "blueprint": { "$ref": "blueprintSchema.json#/definitions/blueprint" }
-            }
-        },
-        {
-            "required": ["blueprint_book"],
-            "additionalProperties": false,
-            "properties": {
-                "blueprint_book": {
-                    "type": "object",
-                    "required": ["version", "item", "active_index", "blueprints"],
-                    "additionalProperties": false,
-                    "properties": {
-                        "version": { "type": "integer" },
-                        "item": {
-                            "type": "string",
-                            "const": "blueprint_book"
-                        },
-                        "label": { "type": "string" },
-                        "active_index": { "type": "integer" },
-                        "blueprints": {
-                            "type": "array",
-                            "minItems": 1,
-                            "maxITems": 1000,
-                            "items": {
-                                "type": "object",
-                                "required": ["index", "blueprint"],
-                                "additionalProperties": false,
-                                "properties": {
-                                    "index": { "type": "integer" },
-                                    "blueprint": {
-                                        "$ref": "blueprintSchema.json#/definitions/blueprint"
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    ],
+    "additionalProperties": false,
+    "properties": {
+        "blueprint": { "$ref": "blueprintSchema.json#/definitions/blueprint" },
+        "blueprint_book": { "$ref": "blueprintSchema.json#/definitions/blueprint_book" }
+    },
     "definitions": {
         "position": {
             "type": "object",
@@ -118,6 +78,23 @@
                 }
             }
         },
+        "icons": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 4,
+            "items": {
+                "type": "object",
+                "required": ["index", "signal"],
+                "additionalProperties": false,
+                "properties": {
+                    "index": {
+                        "type": "integer",
+                        "enum": [1, 2, 3, 4]
+                    },
+                    "signal": { "$ref": "blueprintSchema.json#/definitions/signal" }
+                }
+            }
+        },
         "blueprint": {
             "type": "object",
             "required": ["version", "item", "icons"],
@@ -129,23 +106,15 @@
                     "const": "blueprint"
                 },
                 "label": { "type": "string" },
-                "icons": {
-                    "type": "array",
-                    "minItems": 1,
-                    "maxItems": 4,
-                    "items": {
-                        "type": "object",
-                        "required": ["index", "signal"],
-                        "additionalProperties": false,
-                        "properties": {
-                            "index": {
-                                "type": "integer",
-                                "enum": [1, 2, 3, 4]
-                            },
-                            "signal": { "$ref": "blueprintSchema.json#/definitions/signal" }
-                        }
-                    }
+                "description": { "type": "string" },
+                "absolute_snapping": { "type": "boolean" },
+                "snap_to_grid": {
+                    "$ref": "blueprintSchema.json#/definitions/position"
                 },
+                "position_relative_to_grid": {
+                    "$ref": "blueprintSchema.json#/definitions/position"
+                },
+                "icons": { "$ref": "blueprintSchema.json#/definitions/icons" },
                 "schedules": {
                     "type": "array",
                     "items": {
@@ -237,7 +206,12 @@
                             },
                             "items": {
                                 "type": "object",
-                                "objectWithItemNames": true,
+                                "propertyNames": {
+                                    "itemName": true
+                                },
+                                "patternProperties": {
+                                    ".*": { "type": "integer" }
+                                },
                                 "$comment": "object, keys are item names and value nr of items, only present if entity is locomotive or has module_specification, for the locomotive it represents fuel and for an entity with module_specification it represents modules"
                             },
 
@@ -260,6 +234,10 @@
                             "station": {
                                 "type": "string",
                                 "$comment": "train stop station name, only present if entity is train-stop"
+                            },
+                            "manual_trains_limit": {
+                                "type": "integer",
+                                "$comment": "trains limit, only present if entity is train-stop"
                             },
                             "color": {
                                 "type": "object",
@@ -290,6 +268,10 @@
                                 }
                             },
 
+                            "switch_state": {
+                                "type": "boolean",
+                                "$comment": "only present if entity is power-switch"
+                            },
                             "auto_launch": {
                                 "type": "boolean",
                                 "$comment": "auto launch, only present if entity is rocket-silo"
@@ -317,7 +299,7 @@
                                 "$comment": "only present if entity is logistic-chest-storage, logistic-chest-buffer or logistic-chest-requester",
                                 "items": {
                                     "type": "object",
-                                    "required": ["index", "name", "count"],
+                                    "required": ["index", "name"],
                                     "additionalProperties": false,
                                     "properties": {
                                         "index": { "type": "integer" },
@@ -409,6 +391,11 @@
                                 }
                             },
 
+                            "neighbours": {
+                                "type": "array",
+                                "$comment": "power pole wire connections",
+                                "items": { "type": "integer" }
+                            },
                             "connections": {
                                 "type": "object",
                                 "$comment": "wire connections",
@@ -481,6 +468,14 @@
                                         "$comment": "0 = pulse, 1 = hold, only present if entity is of type transport-belt and circuit_read_hand_contents is true"
                                     },
 
+                                    "read_logistics": {
+                                        "type": "boolean",
+                                        "$comment": "only present if entity is roboport"
+                                    },
+                                    "read_robot_stats": {
+                                        "type": "boolean",
+                                        "$comment": "only present if entity is roboport"
+                                    },
                                     "circuit_mode_of_operation": {
                                         "type": "integer",
                                         "$comment": "only present if entity is roboport or logistic-chest-buffer or logistic-chest-requester or of type inserter(3)????????????????"
@@ -534,6 +529,14 @@
                                         "$comment": "only present if entity is train-stop"
                                     },
                                     "train_stopped_signal": {
+                                        "$ref": "blueprintSchema.json#/definitions/signal"
+                                    },
+                                    "set_trains_limit": {
+                                        "type": "boolean",
+                                        "enum": [true],
+                                        "$comment": "only present if entity is train-stop"
+                                    },
+                                    "trains_limit_signal": {
                                         "$ref": "blueprintSchema.json#/definitions/signal"
                                     },
 
@@ -654,6 +657,41 @@
                                 "tileName": false
                             },
                             "position": { "$ref": "blueprintSchema.json#/definitions/position" }
+                        }
+                    }
+                }
+            }
+        },
+        "blueprint_book": {
+            "type": "object",
+            "required": ["version", "item", "active_index", "blueprints"],
+            "additionalProperties": false,
+            "properties": {
+                "version": { "type": "integer" },
+                "item": {
+                    "type": "string",
+                    "const": "blueprint_book"
+                },
+                "label": { "type": "string" },
+                "description": { "type": "string" },
+                "icons": { "$ref": "blueprintSchema.json#/definitions/icons" },
+                "active_index": { "type": "integer" },
+                "blueprints": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 1000,
+                    "items": {
+                        "type": "object",
+                        "required": ["index"],
+                        "additionalProperties": false,
+                        "properties": {
+                            "index": { "type": "integer" },
+                            "blueprint": {
+                                "$ref": "blueprintSchema.json#/definitions/blueprint"
+                            },
+                            "blueprint_book": {
+                                "$ref": "blueprintSchema.json#/definitions/blueprint_book"
+                            }
                         }
                     }
                 }

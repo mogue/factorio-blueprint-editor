@@ -1,8 +1,8 @@
 import EventEmitter from 'eventemitter3'
 import * as PIXI from 'pixi.js'
-import FD from '@fbe/factorio-data'
 import G from '../common/globals'
 import util from '../common/util'
+import FD from './factorioData'
 import { Entity } from './Entity'
 import { WireConnections } from './WireConnections'
 import { PositionGrid } from './PositionGrid'
@@ -34,7 +34,7 @@ const oilOutpostSettings: IOilOutpostSettings = {
 // (uint64_t(minorVersion) << 16) |
 // (uint64_t(majorVersion) << 32) |
 // (uint64_t(mainVersion) << 48)
-const getFactorioVersion = (main = 0, major = 17, minor = 14): number =>
+const getFactorioVersion = (main = 1, major = 1, minor = 11): number =>
     (minor << 16) + (major | (main << 16)) * 0xffffffff
 
 class OurMap<K, V> extends Map<K, V> {
@@ -79,12 +79,19 @@ interface IEntityData extends Omit<BPS.IEntity, 'entity_number'> {
 /** Blueprint base class */
 export class Blueprint extends EventEmitter {
     public name = 'Blueprint'
-    private readonly icons: string[] = []
+    private readonly icons = new Map<1 | 2 | 3 | 4, string>()
     public readonly wireConnections = new WireConnections(this)
     public readonly entityPositionGrid = new PositionGrid(this)
     public readonly entities = new OurMap<number, Entity>()
     public readonly tiles = new OurMap<string, Tile>()
     public readonly history = new History()
+
+    // unused blueprint properties
+    private readonly description?: string
+    private readonly schedules?: BPS.ISchedule[]
+    private readonly absolute_snapping?: boolean
+    private readonly snap_to_grid?: IPoint
+    private readonly position_relative_to_grid?: IPoint
 
     private m_nextEntityNumber = 1
 
@@ -98,20 +105,24 @@ export class Blueprint extends EventEmitter {
 
             if (data.icons) {
                 for (const icon of data.icons) {
-                    this.icons[icon.index - 1] = icon.signal.name
+                    this.icons.set(icon.index, icon.signal.name)
                 }
             }
 
             const positionData = [
-                ...(data.entities || [])
-                    .filter(e => !FD.entities[e.name].flags.includes('placeable_off_grid'))
-                    .map(entity => {
-                        const size = util.switchSizeBasedOnDirection(
-                            FD.entities[entity.name].size,
-                            entity.direction
-                        )
-                        return { x: entity.position.x, y: entity.position.y, w: size.x, h: size.y }
-                    }),
+                ...(data.entities || []).map(entity => {
+                    const POG = FD.entities[entity.name].flags.includes('placeable_off_grid')
+                    const size = util.switchSizeBasedOnDirection(
+                        FD.entities[entity.name].size,
+                        entity.direction
+                    )
+                    return {
+                        x: POG ? Math.floor(entity.position.x) : entity.position.x,
+                        y: POG ? Math.floor(entity.position.y) : entity.position.y,
+                        w: size.x,
+                        h: size.y,
+                    }
+                }),
                 ...(data.tiles || []).map(tile => ({
                     x: tile.position.x + 0.5,
                     y: tile.position.y + 0.5,
@@ -150,7 +161,7 @@ export class Blueprint extends EventEmitter {
 
                 // Approximate position of placeable_off_grid entities (i.e. landmines)
                 for (const e of ENTITIES) {
-                    if (FD.entities[e.name].flags.includes('placeable_off_grid')) continue
+                    if (!FD.entities[e.name].flags.includes('placeable_off_grid')) continue
 
                     const size = util.rotatePointBasedOnDir(
                         [FD.entities[e.name].size.width / 2, FD.entities[e.name].size.height / 2],
@@ -164,13 +175,18 @@ export class Blueprint extends EventEmitter {
                 this.history.startTransaction()
 
                 for (const e of ENTITIES) {
-                    this.wireConnections.createEntityConnections(e.entity_number, e.connections)
+                    this.wireConnections.createEntityConnections(
+                        e.entity_number,
+                        e.connections,
+                        e.neighbours
+                    )
                 }
 
                 this.entities = new OurMap(
                     ENTITIES.map(e => {
                         // remove connections from obj - connections are handled by wireConnections
                         delete e.connections
+                        delete e.neighbours
                         return this.createEntity({
                             ...e,
                             position: {
@@ -182,8 +198,18 @@ export class Blueprint extends EventEmitter {
                     e => e.entityNumber
                 )
 
+                if (data.version < getFactorioVersion(1, 1, 11)) {
+                    this.wireConnections.generatePowerPoleWires()
+                }
+
                 this.history.commitTransaction()
             }
+
+            this.description = data.description
+            this.schedules = data.schedules
+            this.absolute_snapping = data.absolute_snapping
+            this.snap_to_grid = data.snap_to_grid
+            this.position_relative_to_grid = data.position_relative_to_grid
         }
 
         // makes initial entities non undoable and resets the history if the user cleared the editor
@@ -193,7 +219,7 @@ export class Blueprint extends EventEmitter {
         return this
     }
 
-    public createEntity(rawData: IEntityData): Entity {
+    public createEntity(rawData: IEntityData, connectPowerPole = false): Entity {
         const rawEntity = new Entity(
             {
                 ...rawData,
@@ -208,6 +234,8 @@ export class Blueprint extends EventEmitter {
             .updateMap(this.entities, rawEntity.entityNumber, rawEntity, 'Create entity')
             .onDone(this.onCreateOrRemoveEntity.bind(this))
             .commit()
+
+        if (connectPowerPole) this.wireConnections.connectPowerPole(rawEntity.entityNumber)
 
         return rawEntity
     }
@@ -233,19 +261,31 @@ export class Blueprint extends EventEmitter {
         this.history.commitTransaction()
     }
 
-    public fastReplaceEntity(entity: Entity, name: string, direction: number): void {
+    public fastReplaceEntity(name: string, direction: number, position: IPoint): boolean {
+        const entity = this.entityPositionGrid.checkFastReplaceableGroup(name, direction, position)
+
+        if (!entity) return false
+
         this.history.startTransaction('Fast replace entity')
+
+        const connections = this.wireConnections.getEntityConnections(entity.entityNumber)
 
         this.removeEntity(entity)
 
-        // TODO: keep wire connections
         this.createEntity({
             name,
             direction,
             position: entity.position,
+            entity_number: entity.entityNumber,
         }).pasteSettings(entity)
 
+        for (const conn of connections) {
+            this.wireConnections.create(conn)
+        }
+
         this.history.commitTransaction()
+
+        return true
     }
 
     private onCreateOrRemoveEntity(newValue: Entity, oldValue: Entity): void {
@@ -443,6 +483,8 @@ export class Blueprint extends EventEmitter {
             this.createEntity(pole)
         }
 
+        this.wireConnections.generatePowerPoleWires()
+
         for (const p of GP.pumpjacksToRotate) {
             const entity = this.entities.get(p.entity_number)
             entity.direction = p.direction
@@ -508,20 +550,20 @@ export class Blueprint extends EventEmitter {
                 (a, b) => getItemScore(b) - getItemScore(a)
             )
 
-            this.icons[0] = iconPairs[0][0]
+            this.icons.set(1, iconPairs[0][0])
             if (
                 iconPairs[1] &&
                 getSize(iconPairs[1][0]) > 1 &&
                 getItemScore(iconPairs[1]) * 2.5 > getItemScore(iconPairs[0])
             ) {
-                this.icons[1] = iconPairs[1][0]
+                this.icons.set(2, iconPairs[1][0])
             }
         } else if (!this.tiles.isEmpty()) {
             const iconPairs = getIconPairs(this.tiles.valuesArray(), Tile.getItemName).sort(
                 (a, b) => b[1] - a[1]
             )
 
-            this.icons[0] = iconPairs[0][0]
+            this.icons.set(1, iconPairs[0][0])
         }
     }
 
@@ -554,12 +596,19 @@ export class Blueprint extends EventEmitter {
                     }
                 }
             }
+
+            if (e.neighbours) {
+                for (let i = 0; i < e.neighbours.length; i++) {
+                    e.neighbours[i] = oldToNewID.get(e.neighbours[i])
+                }
+            }
+
             return e
         })
     }
 
     public serialize(): BPS.IBlueprint {
-        if (!this.icons.length) {
+        if (!this.icons.size) {
             this.generateIcons()
         }
         const entityInfo = this.processRawEntities(
@@ -582,7 +631,7 @@ export class Blueprint extends EventEmitter {
             },
             name: tile.name,
         }))
-        const iconData = this.icons.map((icon, i) => {
+        const iconData = [...this.icons.entries()].map(([index, icon]) => {
             const getItemTypeForBp = (name: string): BPS.SignalType => {
                 if (FD.signals[name]) return 'virtual'
                 if (FD.fluids[name]) return 'fluid'
@@ -591,7 +640,7 @@ export class Blueprint extends EventEmitter {
 
             return {
                 signal: { type: getItemTypeForBp(icon), name: icon },
-                index: (i + 1) as 1 | 2 | 3 | 4,
+                index,
             }
         })
         return {
@@ -601,6 +650,11 @@ export class Blueprint extends EventEmitter {
             item: 'blueprint',
             version: getFactorioVersion(),
             label: this.name,
+            description: this.description,
+            schedules: this.schedules,
+            absolute_snapping: this.absolute_snapping,
+            snap_to_grid: this.snap_to_grid,
+            position_relative_to_grid: this.position_relative_to_grid,
         }
     }
 }

@@ -1,5 +1,5 @@
 import * as PIXI from 'pixi.js'
-import FD from '@fbe/factorio-data'
+import FD from '../core/factorioData'
 import G from '../common/globals'
 import util from '../common/util'
 import { Entity } from '../core/Entity'
@@ -47,6 +47,7 @@ const containerToBelt = (rotationSpeed: number, beltSpeed: number, n: number): n
 // TODO: add beltToContainer
 
 const roundToTwo = (n: number): number => Math.round(n * 100) / 100
+const roundToFour = (n: number): number => Math.round(n * 10000) / 10000
 
 /**
  * This class creates a panel to show detailed informations about each entity (as the original game and maybe more).
@@ -104,7 +105,6 @@ export class EntityInfoPanel extends Panel {
         this.m_EntityName.position.set(10, nextY)
         nextY = this.m_EntityName.position.y + this.m_EntityName.height + 10
 
-        // TODO: add beacon effect to calculation
         if (entity.entityData.type === 'assembling_machine') {
             // Details for assembling machines with or without recipe
             let productivity = 0
@@ -130,17 +130,40 @@ export class EntityInfoPanel extends Panel {
                 }
             }
 
+            for (const beacon of this.findNearbyBeacons(entity)) {
+                for (const module of beacon.modules) {
+                    if (FD.items[module].effect.productivity) {
+                        productivity +=
+                            FD.items[module].effect.productivity.bonus *
+                            beacon.entityData.distribution_effectivity
+                    }
+                    if (FD.items[module].effect.consumption) {
+                        consumption +=
+                            FD.items[module].effect.consumption.bonus *
+                            beacon.entityData.distribution_effectivity
+                    }
+                    // if (FD.items[module].effect.pollution) {
+                    //     pollution += FD.items[module].effect.pollution.bonus * beacon.entityData.distribution_effectivity
+                    // }
+                    if (FD.items[module].effect.speed) {
+                        speed +=
+                            FD.items[module].effect.speed.bonus *
+                            beacon.entityData.distribution_effectivity
+                    }
+                }
+            }
+
             consumption = consumption < -0.8 ? -0.8 : consumption
             const newCraftingSpeed = entity.entityData.crafting_speed * (1 + speed)
             const newEnergyUsage =
                 parseInt(entity.entityData.energy_usage.slice(0, -2)) * (1 + consumption)
 
             const fmt = (n: number): string =>
-                `(${Math.sign(n) === 1 ? '+' : '-'}${roundToTwo(Math.abs(n)) * 100}%)`
+                `(${Math.sign(n) === 1 ? '+' : '-'}${roundToTwo(Math.abs(n) * 100)}%)`
 
             // Show modules effect and some others informations
             this.m_entityInfo.text = entityInfoTemplate({
-                craftingSpeed: roundToTwo(newCraftingSpeed),
+                craftingSpeed: roundToFour(newCraftingSpeed),
                 speedMultiplier: speed ? fmt(speed) : '',
                 energyUsage: roundToTwo(newEnergyUsage),
                 energyMultiplier: consumption ? fmt(consumption) : '',
@@ -244,5 +267,26 @@ export class EntityInfoPanel extends Panel {
 
     protected setPosition(): void {
         this.position.set(G.app.screen.width - this.width + 1, 0)
+    }
+
+    private findNearbyBeacons(entity: Entity): Entity[] {
+        const entityRect = new PIXI.Rectangle(entity.position.x, entity.position.y)
+        entityRect.pad(entity.size.x / 2, entity.size.y / 2)
+
+        return entity.Blueprint.entities.filter((beacon: Entity): boolean => {
+            if (beacon.type !== 'beacon') {
+                return false
+            }
+
+            const beaconAura = new PIXI.Rectangle(beacon.position.x, beacon.position.y, 1, 1)
+            beaconAura.pad(FD.entities.beacon.supply_area_distance)
+
+            return (
+                beaconAura.contains(entityRect.left, entityRect.top) ||
+                beaconAura.contains(entityRect.right, entityRect.top) ||
+                beaconAura.contains(entityRect.left, entityRect.bottom) ||
+                beaconAura.contains(entityRect.right, entityRect.bottom)
+            )
+        })
     }
 }

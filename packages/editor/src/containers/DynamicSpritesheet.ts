@@ -29,7 +29,7 @@ interface IEntry {
 }
 
 const getCanvas = (baseTexture: PIXI.BaseTexture): HTMLCanvasElement => {
-    const resource = baseTexture.resource as PIXI.resources.CanvasResource
+    const resource = baseTexture.resource as PIXI.CanvasResource
     return resource.source as HTMLCanvasElement
 }
 
@@ -84,6 +84,28 @@ export class DynamicSpritesheet extends EventEmitter {
         }
     }
 
+    public progress(tick: (loaded: number, total: number) => void): void {
+        if (this.loading === 0 && !this.rendering) return
+
+        const total = this.loading
+        let loaded = 0
+        const renderHandler = (): void => {
+            tick(total, total)
+            this.off('load', handler)
+        }
+        this.once('render', renderHandler)
+        const handler = (): void => {
+            loaded += 1
+            tick(loaded, total)
+            if (loaded === total) {
+                this.off('load', handler)
+                this.off('render', renderHandler)
+            }
+        }
+        this.on('load', handler)
+        tick(loaded, total)
+    }
+
     public awaitSprites(): Promise<void> {
         if (this.loading === 0 && !this.rendering) return
 
@@ -94,6 +116,7 @@ export class DynamicSpritesheet extends EventEmitter {
         const image = new Image()
         const finish = (): void => {
             this.loading -= 1
+            this.emit('load')
             if (this.waitingQueue.length > 0) {
                 this.waitingQueue.pop()()
             } else if (this.loading === 0) {
@@ -261,7 +284,7 @@ export class DynamicSpritesheet extends EventEmitter {
                 baseTexture.resource.update()
             } else {
                 oldBaseTextures.set(i, baseTexture)
-                baseTexture = new PIXI.BaseTexture(new PIXI.resources.CanvasResource(canvas))
+                baseTexture = new PIXI.BaseTexture(new PIXI.CanvasResource(canvas))
                 this.baseTextures.set(i, baseTexture)
             }
             G.app.renderer.plugins.prepare.add(baseTexture)

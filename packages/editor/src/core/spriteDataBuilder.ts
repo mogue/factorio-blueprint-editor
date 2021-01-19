@@ -1,3 +1,4 @@
+import util from '../common/util'
 import FD, {
     Entity as FD_Entity,
     SpriteData,
@@ -15,8 +16,7 @@ import FD, {
     PipePictures,
     UndergroundBeltStructure,
     CircuitConnectorSprites,
-} from '@fbe/factorio-data'
-import util from '../common/util'
+} from './factorioData'
 import { PositionGrid } from './PositionGrid'
 import { Entity } from './Entity'
 
@@ -749,7 +749,7 @@ function generateGraphics(e: FD_Entity): (data: IDrawData) => SpriteData[] {
         case 'programmable_speaker':
             return () => [e.sprite.layers[0]]
         case 'power_switch':
-            return () => [e.power_on_animation]
+            return () => [e.power_on_animation.layers[0], e.led_off]
         case 'lab':
             return () => [e.off_animation.layers[0]]
         case 'heat_interface':
@@ -1109,7 +1109,12 @@ function generateGraphics(e: FD_Entity): (data: IDrawData) => SpriteData[] {
             return (data: IDrawData) => {
                 const dir = data.dir
                 let rp = duplicateAndSetPropertyUsing(e.rail_piece, 'x', 'width', dir)
-                let a = duplicateAndSetPropertyUsing(e.animation as SpriteData, 'y', 'height', dir)
+                let a = duplicateAndSetPropertyUsing(
+                    (e.animation as SpriteLayers).layers[0],
+                    'y',
+                    'height',
+                    dir
+                )
                 if (e.name === 'rail_chain_signal') {
                     const getRightShift = (): number[] => {
                         switch (dir) {

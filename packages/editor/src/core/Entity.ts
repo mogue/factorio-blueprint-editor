@@ -1,6 +1,6 @@
 import EventEmitter from 'eventemitter3'
-import FD, { Entity as FD_Entity, getModulesFor } from '@fbe/factorio-data'
 import util from '../common/util'
+import FD, { Entity as FD_Entity } from './factorioData'
 import { Blueprint } from './Blueprint'
 import { getBeltWireConnectionIndex } from './spriteDataBuilder'
 import U from './generators/util'
@@ -107,7 +107,7 @@ export class Entity extends EventEmitter {
             .commit()
     }
 
-    private get maxWireDistance(): number {
+    public get maxWireDistance(): number {
         return (
             this.entityData.circuit_wire_max_distance ||
             this.entityData.wire_max_distance ||
@@ -124,6 +124,9 @@ export class Entity extends EventEmitter {
 
     /** Entity direction */
     public get direction(): number {
+        if (this.type === 'electric_pole') {
+            return this.m_BP.wireConnections.getPowerPoleDirection(this.entityNumber)
+        }
         return this.m_rawEntity.direction === undefined ? 0 : this.m_rawEntity.direction
     }
     public set direction(direction: number) {
@@ -196,7 +199,7 @@ export class Entity extends EventEmitter {
         if (this.entityData.module_specification === undefined) return []
 
         return (
-            getModulesFor(this.name)
+            FD.getModulesFor(this.name)
                 // filter modules based on module limitation
                 .filter(
                     item =>
@@ -241,8 +244,14 @@ export class Entity extends EventEmitter {
     public get filterSlots(): number {
         if (this.name.includes('splitter')) return 1
         if (this.entityData.filter_count !== undefined) return this.entityData.filter_count
-        if (this.entityData.logistic_slots_count !== undefined) {
-            return this.entityData.logistic_slots_count
+        if (this.entityData.max_logistic_slots !== undefined) {
+            return this.entityData.max_logistic_slots
+        }
+        if (this.name === 'logistic_chest_buffer' || this.name === 'logistic_chest_requester') {
+            return this.logisticChestFilters.reduce(
+                (max, filter) => Math.max(max, filter.index),
+                30 // TODO: find a way to fix this properly
+            )
         }
         return 0
     }
@@ -393,7 +402,7 @@ export class Entity extends EventEmitter {
 
     /** Logistic chest filters */
     private get logisticChestFilters(): IFilter[] {
-        return this.m_rawEntity.request_filters
+        return this.m_rawEntity.request_filters || []
     }
     private set logisticChestFilters(filters: IFilter[]) {
         if (filters === undefined && this.m_rawEntity.request_filters === undefined) return
@@ -687,6 +696,12 @@ export class Entity extends EventEmitter {
         return (
             this.recipe &&
             FD.recipes[this.recipe].category === 'crafting_with_fluid' &&
+            this.mayCraftWithFluid
+        )
+    }
+
+    public get mayCraftWithFluid(): boolean {
+        return (
             this.entityData.crafting_categories &&
             this.entityData.crafting_categories.includes('crafting_with_fluid')
         )
@@ -737,10 +752,10 @@ export class Entity extends EventEmitter {
         return e.circuit_wire_connection_points[getIndex()].wire[color]
     }
 
-    public serialize(): BPS.IEntity {
+    public serialize(entNrWhitelist?: Set<number>): BPS.IEntity {
         return util.duplicate({
             ...this.m_rawEntity,
-            connections: this.m_BP.wireConnections.serializeConnectionData(this.entityNumber),
+            ...this.m_BP.wireConnections.serializeConnectionData(this.entityNumber, entNrWhitelist),
         })
     }
 }

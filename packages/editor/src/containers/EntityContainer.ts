@@ -1,5 +1,5 @@
 import * as PIXI from 'pixi.js'
-import FD, { CursorBoxType } from '@fbe/factorio-data'
+import FD, { CursorBoxType } from '../core/factorioData'
 import G from '../common/globals'
 import { Entity } from '../core/Entity'
 import { EntitySprite } from './EntitySprite'
@@ -26,9 +26,6 @@ export class EntityContainer {
 
     private readonly m_Entity: Entity
 
-    /** mechanism to make sure that the result of the promise is still needed */
-    private getPartsPromise: Promise<EntitySprite[]>
-
     public constructor(entity: Entity, sort = true) {
         this.m_Entity = entity
 
@@ -44,7 +41,7 @@ export class EntityContainer {
 
         const onRecipeChange = (): void => {
             this.redrawEntityInfo()
-            if (this.m_Entity.name === 'chemical_plant' || this.m_Entity.assemblerCraftsWithFluid) {
+            if (this.m_Entity.name === 'chemical_plant' || this.m_Entity.mayCraftWithFluid) {
                 this.redraw()
                 this.redrawSurroundingEntities()
             }
@@ -56,7 +53,7 @@ export class EntityContainer {
 
             this.updateUndergroundLine()
             this.redrawEntityInfo()
-            G.BPC.wiresContainer.update(this.m_Entity)
+            G.BPC.wiresContainer.update(this.m_Entity.entityNumber)
         }
 
         const onDirectionTypeChange = (): void => {
@@ -73,7 +70,7 @@ export class EntityContainer {
 
             this.updateUndergroundLine()
             this.redrawEntityInfo()
-            G.BPC.wiresContainer.update(this.m_Entity)
+            G.BPC.wiresContainer.update(this.m_Entity.entityNumber)
             this.visualizationArea.moveTo(this.position)
         }
 
@@ -87,7 +84,6 @@ export class EntityContainer {
         const onEntityDestroy = (): void => {
             this.redrawSurroundingEntities()
 
-            this.getPartsPromise = null
             for (const s of this.entitySprites) {
                 s.destroy()
             }
@@ -332,28 +328,21 @@ export class EntityContainer {
                 .forEach(entity => {
                     EntityContainer.mappings.get(entity.entityNumber).redraw()
                     if (entity.type === 'transport_belt') {
-                        G.BPC.wiresContainer.update(entity)
+                        G.BPC.wiresContainer.update(entity.entityNumber)
                     }
                 })
         }
     }
 
     public redraw(ignoreConnections?: boolean, sort?: boolean): void {
-        const promise = EntitySprite.getPartsAsync(
+        for (const s of this.entitySprites) {
+            s.destroy()
+        }
+        this.entitySprites = EntitySprite.getParts(
             this.m_Entity,
             this.position,
             ignoreConnections ? undefined : G.bp.entityPositionGrid
         )
-        this.getPartsPromise = promise
-
-        promise.then(sprites => {
-            if (this.getPartsPromise !== promise) return
-
-            for (const s of this.entitySprites) {
-                s.destroy()
-            }
-            this.entitySprites = sprites
-            G.BPC.addEntitySprites(this.entitySprites, sort)
-        })
+        G.BPC.addEntitySprites(this.entitySprites, sort)
     }
 }

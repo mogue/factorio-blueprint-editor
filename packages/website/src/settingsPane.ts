@@ -1,6 +1,5 @@
 import { GUI } from 'dat.gui'
-import { getModulesFor } from '@fbe/factorio-data'
-import EDITOR, { Blueprint, Book, GridPattern, Editor } from '@fbe/editor'
+import EDITOR, { Blueprint, Book, GridPattern, Editor, FD } from '@fbe/editor'
 
 GUI.TEXT_CLOSED = 'Close Settings'
 GUI.TEXT_OPEN = 'Open Settings'
@@ -30,7 +29,7 @@ export function initSettingsPane(
         gui.domElement.style.maxHeight = `${window.innerHeight}px`
     })
 
-    window.addEventListener('unload', () =>
+    window.addEventListener('visibilitychange', () =>
         localStorage.setItem('dat.gui.closed', String(gui.closed))
     )
 
@@ -102,7 +101,7 @@ export function initSettingsPane(
         const settings = JSON.parse(localStorage.getItem('oilOutpostSettings'))
         editor.oilOutpostSettings = settings
     }
-    window.addEventListener('unload', () =>
+    window.addEventListener('visibilitychange', () =>
         localStorage.setItem('oilOutpostSettings', JSON.stringify(editor.oilOutpostSettings))
     )
 
@@ -115,7 +114,7 @@ export function initSettingsPane(
     })
 
     function getModulesObjFor(entityName: string): Record<string, string> {
-        return getModulesFor(entityName)
+        return FD.getModulesFor(entityName)
             .sort((a, b) => a.order.localeCompare(b.order))
             .reduce<Record<string, string>>(
                 (obj, item) => {

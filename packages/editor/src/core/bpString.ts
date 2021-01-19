@@ -1,6 +1,6 @@
 import Ajv, { KeywordDefinition } from 'ajv'
 import pako from 'pako'
-import FD from '@fbe/factorio-data'
+import FD from './factorioData'
 import blueprintSchema from './blueprintSchema.json'
 import { Blueprint } from './Blueprint'
 import { Book } from './Book'
@@ -57,14 +57,13 @@ const keywords: Record<string, KeywordDefinition> = {
         errors: false,
         schema: false,
     },
-    objectWithItemNames: {
-        validate: (data: object) => Object.keys(data).every(key => !!FD.items[key]),
-        errors: false,
-        schema: false,
-    },
 }
 
-const validate = new Ajv({ keywords, verbose: true }).compile(blueprintSchema)
+const validate = new Ajv({
+    keywords,
+    verbose: true,
+    strictKeywords: 'log',
+}).compile(blueprintSchema)
 
 const nameMigrations: Record<string, string> = {
     // if (blueprintVersion < getFactorioVersion(0, 17, 0))
@@ -148,7 +147,7 @@ function getBlueprintOrBookFromSource(source: string): Promise<Blueprint | Book>
                 reject(e)
             }
         }).then((url: URL) => {
-            const corsProxy = './api/proxy?url='
+            const corsProxy = 'https://api.allorigins.win/raw?url='
 
             console.log(`Loading data from: ${url}`)
             const pathParts = url.pathname.slice(1).split('/')
@@ -176,7 +175,7 @@ function getBlueprintOrBookFromSource(source: string): Promise<Blueprint | Book>
                 case 'gitlab':
                     // https://gitlab.com/gitlab-org/gitlab-ce/issues/24596
                     return fetchData(
-                        `${corsProxy}https://gitlab.com/snippets/${pathParts[1]}/raw`
+                        `${corsProxy}https://gitlab.com/${pathParts.join('/')}/raw`
                     ).then(r => r.text())
                 case 'factorioprints':
                     return fetchData(

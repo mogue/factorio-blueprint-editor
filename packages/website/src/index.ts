@@ -1,6 +1,6 @@
 import './index.styl'
 
-import { utils as pixiUtils } from 'pixi.js'
+import { isMobile } from '@pixi/settings'
 import FileSaver from 'file-saver'
 import EDITOR, {
     Editor,
@@ -48,7 +48,7 @@ console.log(
 initFeedbackButton()
 const createToast = initToasts()
 
-if (pixiUtils.isMobile.any) {
+if (isMobile.any) {
     createToast({
         text:
             'Application is not compatible with mobile devices.<br>' +
@@ -98,7 +98,7 @@ editor
         registerActions()
 
         const changeBookIndex = async (index: number): Promise<void> => {
-            bp = book.getBlueprint(index)
+            bp = book.selectBlueprint(index)
             await editor.loadBlueprint(bp)
         }
         changeBookForIndexSelector = initSettingsPane(editor, changeBookIndex).changeBook
@@ -117,15 +117,16 @@ editor
         throw new Error('UNRECOVERABLE_ERROR')
     })
 
-window.addEventListener('unload', () => {
+window.addEventListener('visibilitychange', () => {
     localStorage.setItem('quickbarItemNames', JSON.stringify(editor.quickbarItems))
 })
 
 async function loadBp(bpOrBook: Blueprint | Book): Promise<void> {
     if (bpOrBook instanceof Book) {
         book = bpOrBook
-        bp = book.getBlueprint(bpIndex ? bpIndex : undefined)
+        bp = book.selectBlueprint(bpIndex ? bpIndex : undefined)
     } else {
+        book = undefined
         bp = bpOrBook
     }
 
@@ -198,15 +199,17 @@ function registerActions(): void {
         },
     })
 
-    EDITOR.registerAction('info', 'i').bind({
-        press: () => {
-            const infoPanel = document.getElementById('info-panel')
+    window.addEventListener('keydown', e => {
+        const infoPanel = document.getElementById('info-panel')
+        if (e.key === 'i') {
             if (infoPanel.classList.contains('active')) {
                 infoPanel.classList.remove('active')
             } else {
                 infoPanel.classList.add('active')
             }
-        },
+        } else if (e.key === 'Escape') {
+            infoPanel.classList.remove('active')
+        }
     })
 
     EDITOR.registerAction('takePicture', 'modifier+s').bind({
@@ -222,7 +225,7 @@ function registerActions(): void {
 
     EDITOR.importKeybinds(JSON.parse(localStorage.getItem('keybinds')))
 
-    window.addEventListener('unload', () => {
+    window.addEventListener('visibilitychange', () => {
         const keybinds = EDITOR.exportKeybinds()
         if (Object.keys(keybinds).length) {
             localStorage.setItem('keybinds', JSON.stringify(keybinds))

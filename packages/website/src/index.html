@@ -19,25 +19,31 @@
 
     <body oncontextmenu="return false;">
         <div id="loadingScreen" class="active">
-            <img id="logo" src="$import('../assets/logo.svg')" />
-            <img class="loadingWheel" src="$import('../assets/loadingWheel.svg')" />
+            <img id="logo" src="$import('../assets/logo.svg')" alt />
+            <img class="loadingWheel" src="$import('../assets/loadingWheel.svg')" alt />
         </div>
         <div id="corner-panel">
-            <img src="$import('../assets/logo-small.svg')" />
+            <img src="$import('../assets/logo-small.svg')" alt />
             <span>Press I for info</span>
         </div>
         <div id="buttons">
-            <a class="discord-button" target="_blank" href="https://discord.gg/c5eXyBU">
+            <a
+                class="discord-button"
+                href="https://discord.gg/c5eXyBU"
+                target="_blank"
+                rel="noopener"
+            >
                 <span>Discord</span>
-                <img src="$import('../assets/discord.svg')" />
+                <img src="$import('../assets/discord.svg')" alt />
             </a>
             <a
                 class="github-button"
-                target="_blank"
                 href="https://github.com/Teoxoy/factorio-blueprint-editor"
+                target="_blank"
+                rel="noopener"
             >
                 <span>Github</span>
-                <img src="$import('../assets/github.svg')" />
+                <img src="$import('../assets/github.svg')" alt />
             </a>
         </div>
         <div id="info-panel">

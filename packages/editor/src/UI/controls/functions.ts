@@ -1,5 +1,5 @@
 import * as PIXI from 'pixi.js'
-import FD, { IngredientOrResult, ColorWithAlpha, Item, Icon } from '@fbe/factorio-data'
+import FD, { IngredientOrResult, ColorWithAlpha, Item, Icon } from '../../core/factorioData'
 import { styles } from '../style'
 import G from '../../common/globals'
 
@@ -48,31 +48,55 @@ function DrawRectangle(
     } else {
         if (border > 0) {
             rectangle
-                .lineStyle(1, ShadeColor(background, pressed ? -12.5 : 22.5), 1, 0)
+                .lineStyle({
+                    width: 1,
+                    color: ShadeColor(background, pressed ? -12.5 : 22.5),
+                    alignment: 0,
+                })
                 .moveTo(0, height)
                 .lineTo(0, 0)
                 .lineTo(width, 0)
-                .lineStyle(1, ShadeColor(background, pressed ? 10 : -7.5), 1, 0)
+                .lineStyle({
+                    width: 1,
+                    color: ShadeColor(background, pressed ? 10 : -7.5),
+                    alignment: 0,
+                })
                 .lineTo(width, height)
                 .lineTo(0, height)
         }
         if (border > 1) {
             rectangle
-                .lineStyle(1, ShadeColor(background, pressed ? -10 : 20), 1, 0)
+                .lineStyle({
+                    width: 1,
+                    color: ShadeColor(background, pressed ? -10 : 20),
+                    alignment: 0,
+                })
                 .moveTo(1, height - 1)
                 .lineTo(1, 1)
                 .lineTo(width - 1, 1)
-                .lineStyle(1, ShadeColor(background, pressed ? 7.5 : -5), 1, 0)
+                .lineStyle({
+                    width: 1,
+                    color: ShadeColor(background, pressed ? 7.5 : -5),
+                    alignment: 0,
+                })
                 .lineTo(width - 1, height - 1)
                 .lineTo(1, height - 1)
         }
         if (border > 2) {
             rectangle
-                .lineStyle(1, ShadeColor(background, pressed ? -7.5 : 17.5), 1, 0)
+                .lineStyle({
+                    width: 1,
+                    color: ShadeColor(background, pressed ? -7.5 : 17.5),
+                    alignment: 0,
+                })
                 .moveTo(2, height - 2)
                 .lineTo(2, 2)
                 .lineTo(width - 2, 2)
-                .lineStyle(1, ShadeColor(background, pressed ? 5 : -2.5), 1, 0)
+                .lineStyle({
+                    width: 1,
+                    color: ShadeColor(background, pressed ? 5 : -2.5),
+                    alignment: 0,
+                })
                 .lineTo(width - 2, height - 2)
                 .lineTo(2, height - 2)
         }
@@ -88,7 +112,7 @@ function DrawRectangle(
  * @param h - Height
  * @param f - Factor
  * @param c - Background Color
- * @param c - Background Alpha
+ * @param a - Background Alpha
  * @param p0 - Percent shade for brightest border
  * @param p1 - Percent shade for bright border
  * @param p2 - Percent shade for dark border
@@ -115,19 +139,19 @@ function DrawControlFace(
     face.beginFill(c, a)
         .drawRect(0, 0, wf, hf)
         .endFill()
-        .lineStyle(f, ShadeColor(c, p3), a, 0)
+        .lineStyle({ width: f, color: ShadeColor(c, p3), alpha: a, alignment: 0 })
         .moveTo(wf, 0)
         .lineTo(wf, hf)
         .lineTo(0, hf)
-        .lineStyle(f, ShadeColor(c, p2), a, 0)
+        .lineStyle({ width: f, color: ShadeColor(c, p2), alpha: a, alignment: 0 })
         .moveTo(wf - f, f)
         .lineTo(wf - f, hf - f)
         .lineTo(f, hf - f)
-        .lineStyle(f, ShadeColor(c, p1), a, 0)
+        .lineStyle({ width: f, color: ShadeColor(c, p1), alpha: a, alignment: 0 })
         .moveTo(wf - f, f)
         .lineTo(f, f)
         .lineTo(f, hf - f)
-        .lineStyle(f, ShadeColor(c, p0), a, 0)
+        .lineStyle({ width: f, color: ShadeColor(c, p0), alpha: a, alignment: 0 })
         .moveTo(wf, 0)
         .lineTo(0, 0)
         .lineTo(0, hf)
@@ -141,6 +165,7 @@ function DrawControlFace(
 /** Create Icon from Sprite Item information */
 function CreateIcon(
     itemName: string,
+    maxSize = 32,
     setAnchor = true,
     darkBackground = false
 ): PIXI.DisplayObject {
@@ -162,20 +187,9 @@ function CreateIcon(
         const icon =
             darkBackground && data.dark_background_icon ? data.dark_background_icon : data.icon
 
-        let texture: PIXI.Texture
-
-        if (data.icon_mipmaps) {
-            const targetSize = 32
-            let xOffset = 0
-            for (let i = Math.log2(data.icon_size); i > Math.log2(targetSize); i--) {
-                xOffset += Math.pow(2, i)
-            }
-            texture = G.sheet.get(icon, xOffset, 0, targetSize, targetSize)
-        } else {
-            texture = G.sheet.get(icon)
-        }
-
+        const texture = G.getTexture(icon, 0, 0, data.icon_size, data.icon_size)
         const sprite = new PIXI.Sprite(texture)
+        sprite.scale.set(maxSize / data.icon_size)
         if (setAnchor) {
             sprite.anchor.set(0.5)
         }
@@ -226,7 +240,7 @@ function CreateIconWithAmount(
     name: string,
     amount: number
 ): void {
-    const icon: PIXI.DisplayObject = CreateIcon(name, false)
+    const icon: PIXI.DisplayObject = CreateIcon(name, undefined, false)
     icon.position.set(x, y)
     host.addChild(icon)
 

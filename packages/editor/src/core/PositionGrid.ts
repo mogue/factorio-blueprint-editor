@@ -1,5 +1,5 @@
-import FD from '@fbe/factorio-data'
 import util from '../common/util'
+import FD from './factorioData'
 import { Blueprint } from './Blueprint'
 import { Entity } from './Entity'
 
@@ -330,7 +330,7 @@ export class PositionGrid {
         return entity
     }
 
-    /** Returns all entities in the area and optinally filters them via the function */
+    /** Returns all entities in the area */
     public getEntitiesInArea(area: IArea): Entity[] {
         const entities = new Set<Entity>()
         this.tileDataAction(area, (_, cell) => {

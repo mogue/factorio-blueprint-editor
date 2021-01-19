@@ -1,5 +1,5 @@
 import * as PIXI from 'pixi.js'
-import FD from '@fbe/factorio-data'
+import FD from '../../../core/factorioData'
 import G from '../../../common/globals'
 import F from '../../controls/functions'
 import { Slot } from '../../controls/Slot'
@@ -101,10 +101,20 @@ export class Filters extends PIXI.Container {
         this.m_UpdateSlots()
 
         // Listen to filter changes on entity
-        this.m_Entity.on('filters', () => {
+        this.onEntityChange('filters', () => {
             this.m_UpdateFilters()
             this.m_UpdateSlots()
         })
+    }
+
+    private onEntityChange(event: string, fn: (...args: any[]) => void): void {
+        this.m_Entity.on(event, fn)
+        this.once('destroy', () => this.m_Entity.off(event, fn))
+    }
+
+    public destroy(opts?: boolean | PIXI.IDestroyOptions): void {
+        this.emit('destroy')
+        super.destroy(opts)
     }
 
     /**
@@ -194,7 +204,7 @@ export class Filters extends PIXI.Container {
     }
 
     /** Slot pointer down event handler */
-    private readonly onSlotPointerDown = (e: PIXI.interaction.InteractionEvent): void => {
+    private readonly onSlotPointerDown = (e: PIXI.InteractionEvent): void => {
         e.stopPropagation()
         const slot: Slot = e.target as Slot
         const index: number = slot.data as number

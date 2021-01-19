@@ -1,3 +1,55 @@
+function getModulesFor(entityName: string): Item[] {
+    return (
+        Object.keys(FD.items)
+            .map(k => FD.items[k])
+            .filter(item => item.type === 'module')
+            // filter modules based on entity allowed_effects (ex: beacons don't accept productivity effect)
+            .filter(
+                item =>
+                    !FD.entities[entityName].allowed_effects ||
+                    Object.keys(item.effect).every(effect =>
+                        FD.entities[entityName].allowed_effects.includes(effect)
+                    )
+            )
+    )
+}
+
+// @ts-ignore
+const FD: {
+    items: Record<string, Item>
+    fluids: Record<string, Fluid>
+    signals: Record<string, VirtualSignal>
+    recipes: Record<string, Recipe>
+    entities: Record<string, Entity>
+    tiles: Record<string, Tile>
+    inventoryLayout: InventoryLayoutGroup[]
+    utilitySprites: UtilitySprites
+    // treesAndRocks: Record<string, TreeOrRock>
+
+    getModulesFor: (entityName: string) => Item[]
+} = {}
+
+export function loadData(str: string): void {
+    // convert every - to _ without file paths
+    const data = JSON.parse(
+        str.replace(/("(?!__base__|__core__)[^":]+?-[^":]+?")/g, (_: string, capture: string) =>
+            capture.replace(/-/g, '_')
+        )
+    )
+    console.log(data)
+    FD.items = data.items
+    FD.fluids = data.fluids
+    FD.signals = data.signals
+    FD.recipes = data.recipes
+    FD.entities = data.entities
+    FD.tiles = data.tiles
+    FD.inventoryLayout = data.inventoryLayout
+    FD.utilitySprites = data.utilitySprites
+    FD.getModulesFor = getModulesFor
+}
+
+export default FD
+
 /* eslint-disable import/group-exports */
 
 export interface Color {
